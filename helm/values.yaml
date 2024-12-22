@@ -1,0 +1,21 @@
+homework:
+  replicaCount: 1
+  image:
+    repository:
+    tag: latest
+    pullPolicy: Always
+  service:
+    name: homework-service
+    env: live
+    port: 8080
+  resources:
+    limits:
+      cpu: 1
+      memory: 2Gi
+    requests:
+      cpu: 1
+      memory: 2Gi
+  node_selector:
+    os: linux
+  spring:
+    env: live

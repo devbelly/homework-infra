@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.homework.service.name }}-{{ .Values.homework.service.env }}
+spec:
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.homework.service.name }}-{{ .Values.homework.service.env }}
+  replicas: {{ .Values.homework.replicaCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.homework.service.name }}-{{ .Values.homework.service.env }}
+    spec:
+      containers:
+          - name: {{ .Values.homework.service.name }}-{{ .Values.homework.service.env }}
+            resources:
+              requests:
+                cpu: "{{ .Values.homework.resources.requests.cpu }}"
+                memory: "{{ .Values.homework.resources.requests.memory }}"
+              limits:
+                cpu: "{{ .Values.homework.resources.limits.cpu }}"
+                memory: "{{ .Values.homework.resources.limits.memory }}"
+            image: "{{ .Values.homework.image.repository }}:{{ .Values.homework.image.tag }}"
+            imagePullPolicy: {{ .Values.homework.image.pullPolicy }}
+            ports:
+              - name: "service-port"
+                containerPort: {{ .Values.homework.service.port }}
+            env:
+              - name: SPRING_PROFILES_ACTIVE
+                value: {{ .Values.homework.spring.env }}
+              - name: STORAGE_DATABASE_URL
+                valueFrom:
+                    secretKeyRef:
+                        name: mysql-secret
+                        key: STORAGE_DATABASE_URL
+              - name: STORAGE_DATABASE_USERNAME
+                valueFrom:
+                    secretKeyRef:
+                        name: mysql-secret
+                        key: STORAGE_DATABASE_USERNAME
+              - name: STORAGE_DATABASE_PASSWORD
+                valueFrom:
+                    secretKeyRef:
+                        name: mysql-secret
+                        key: STORAGE_DATABASE_PASSWORD
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: {{ .Values.homework.service.port }}
+              initialDelaySeconds: 60
+              timeoutSeconds: 30
+              periodSeconds: 30
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: {{ .Values.homework.service.port }}
+              initialDelaySeconds: 60
+              timeoutSeconds: 30
+              periodSeconds: 30
+            lifecycle:
+              preStop:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - sleep 40
+      terminationGracePeriodSeconds: 60
+      nodeSelector:
+        kubernetes.io/os : "{{ .Values.homework.node_selector.os }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-nlb-test
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: service.k8s.aws/nlb
+  selector:
+    app: {{ .Values.homework.service.name }}-{{ .Values.homework.service.env }}
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
